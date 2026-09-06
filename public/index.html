@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2F4F4F">
+<title>Quét hóa đơn ăn uống</title>
+<style>
+  :root{
+    color-scheme: light;
+    --gold:#F2B705; --gold-deep:#D99A00; --gold-soft:#FFDE7A; --gold-tint:#FFF7DF;
+    --cream:#FFFCF4; --card:#FFFFFF;
+    --ink:#2A2622; --ink-soft:#5C5546; --muted:#8C8271;
+    --line:#EDE2C7; --line-soft:#F4EEDD;
+    --danger:#B3261E; --danger-bg:#FDECEA;
+    --warn:#C2740A; --warn-bg:#FFF1DC;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cream);color:var(--ink);
+       font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+       -webkit-text-size-adjust:100%}
+  header{background:linear-gradient(135deg,#FFE9A6 0%,#FFD24D 55%,#FFC01F 100%);
+         color:#3A2E05;padding:20px 16px;border-bottom:1px solid var(--gold-deep)}
+  header h1{margin:0;font-size:18px;letter-spacing:.2px;font-weight:800}
+  header p{margin:5px 0 0;font-size:12.5px;color:#6B5510}
+  main{max-width:760px;margin:0 auto;padding:18px 14px 80px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;
+        margin-bottom:14px;box-shadow:0 1px 2px rgba(180,150,40,.06)}
+  .card h2{margin:0 0 13px;font-size:12.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
+  label{display:block;font-size:12.5px;color:var(--ink-soft);margin-bottom:4px}
+  input,select,textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:10px;
+       font:inherit;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--gold);outline-offset:-1px;border-color:var(--gold)}
+  .grid{display:grid;gap:10px}
+  .grid.g3{grid-template-columns:1fr 1fr 1fr}
+  button{font:inherit;border:0;border-radius:11px;padding:13px 16px;cursor:pointer;font-weight:700}
+  .btn-primary{background:var(--gold);color:#3A2E05;width:100%;box-shadow:0 1px 0 var(--gold-deep)}
+  .btn-primary:hover{background:#FFC72B}
+  .btn-primary:disabled{background:#F6EAC2;color:#A99A72;box-shadow:none;cursor:not-allowed}
+  .btn-gold{background:linear-gradient(135deg,#FFD24D,#F2B705);color:#3A2E05;width:100%;
+            box-shadow:0 1px 0 var(--gold-deep)}
+  .btn-gold:hover{filter:brightness(1.05)}
+  .btn-gold:disabled{background:#F6EAC2;color:#A99A72;box-shadow:none;cursor:not-allowed}
+  .btn-ghost{background:#fff;color:var(--ink-soft);border:1px solid var(--line);padding:9px 13px;font-weight:600}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--ink)}
+  #drop{border:2px dashed var(--gold-soft);border-radius:14px;background:var(--gold-tint);
+        padding:30px 16px;text-align:center;color:#7A6212;cursor:pointer;transition:.15s}
+  #drop:hover,#drop.over{background:#FFF2C9;border-color:var(--gold)}
+  #drop strong{display:block;font-size:15.5px;margin-bottom:4px;color:#5C4A08}
+  #drop span{font-size:12.5px;opacity:.85}
+  #preview{margin-top:12px;display:none}
+  #preview img{width:100%;border-radius:12px;border:1px solid var(--line)}
+  .item{border:1px solid var(--line-soft);border-radius:12px;padding:12px;margin-bottom:9px;background:#FFFDF6}
+  .item .top{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .item .top input{flex:1}
+  .item .nums{display:grid;grid-template-columns:64px 1fr 1fr;gap:8px;align-items:end}
+  .item .line-total{font-weight:800;text-align:right;padding:10px 4px;color:#6B5510;
+                    font-variant-numeric:tabular-nums}
+  .del{background:var(--danger-bg);color:var(--danger);border-radius:9px;padding:9px 12px;font-weight:800;line-height:1}
+  .total-bar{display:flex;justify-content:space-between;align-items:center;
+       background:linear-gradient(135deg,#FFF7DF,#FFEDB8);
+       border:1px solid var(--gold-soft);border-radius:13px;padding:14px 16px;margin:13px 0}
+  .total-bar span{font-weight:600;color:#6B5510}
+  .total-bar b{font-size:21px;color:#3A2E05;font-variant-numeric:tabular-nums}
+  .warn{background:var(--warn-bg);border-left:4px solid var(--warn);border-radius:10px;padding:12px 14px;
+        font-size:13px;margin-bottom:12px;color:#6B3F05}
+  .warn ul{margin:6px 0 0;padding-left:18px}
+  .err{background:var(--danger-bg);border-left:4px solid var(--danger);color:var(--danger);
+       border-radius:10px;padding:12px 14px;font-size:13.5px;margin-bottom:12px}
+  .ok{background:var(--gold-tint);border-left:4px solid var(--gold);border-radius:10px;
+      padding:14px 16px;font-size:14px;color:#5C4A08}
+  .ok a{color:#8A6A00;font-weight:800}
+  .hidden{display:none}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(58,46,5,.25);
+        border-top-color:#3A2E05;border-radius:50%;animation:s .7s linear infinite;
+        vertical-align:-3px;margin-right:8px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  footer{text-align:center;color:var(--muted);font-size:11.5px;padding:0 16px 30px}
+  @media(max-width:480px){
+    .grid.g3{grid-template-columns:1fr}
+    .item .nums{grid-template-columns:64px 1fr}
+    .item .nums > div:nth-child(3){grid-column:1/-1}
+    .item .line-total{grid-column:1/-1;text-align:right;padding-top:4px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Quét hóa đơn → Google Sheet</h1>
+  <p>Groq Vision · Quan_Ly_Chi_Phi_An_Uong</p>
+</header>
+
+<main>
+  <div class="card hidden" id="gate">
+    <h2>Mật khẩu ứng dụng</h2>
+    <input type="password" id="pw" placeholder="Nhập mật khẩu" autocomplete="current-password">
+    <div style="height:10px"></div>
+    <button class="btn-primary" id="pwBtn">Mở khóa</button>
+  </div>
+
+  <div class="card" id="uploadCard">
+    <h2>1 · Ảnh hóa đơn</h2>
+    <div id="drop">
+      <strong>Chụp hoặc chọn ảnh</strong>
+      <span>Bấm vào đây · kéo thả · dán ảnh (Ctrl+V)</span>
+    </div>
+    <input type="file" id="file" accept="image/*" capture="environment" class="hidden">
+    <div id="preview"><img id="previewImg" alt="Xem trước hóa đơn"></div>
+    <div style="height:12px"></div>
+    <button class="btn-primary" id="scanBtn" disabled>Đọc hóa đơn</button>
+  </div>
+
+  <div id="msg"></div>
+
+  <div class="card hidden" id="resultCard">
+    <h2>2 · Kiểm tra &amp; sửa trước khi lưu</h2>
+    <div id="warnBox"></div>
+    <div class="grid g3">
+      <div><label for="fDate">Ngày</label><input type="date" id="fDate"></div>
+      <div><label for="fMeal">Bữa</label><select id="fMeal"></select></div>
+      <div><label for="fInv">Mã hóa đơn</label><input id="fInv"></div>
+    </div>
+    <div style="height:10px"></div>
+    <label for="fStore">Cửa hàng</label><input id="fStore">
+    <div style="height:16px"></div>
+    <label>Các dòng hàng</label>
+    <div id="items"></div>
+    <button class="btn-ghost" id="addItem">+ Thêm dòng</button>
+    <div class="total-bar"><span>Tổng cộng</span><b id="grandTotal">0 ₫</b></div>
+    <label for="fNote">Ghi chú</label>
+    <textarea id="fNote" rows="2" placeholder="Không bắt buộc"></textarea>
+    <div style="height:12px"></div>
+    <button class="btn-gold" id="saveBtn">Lưu vào Google Sheet</button>
+  </div>
+</main>
+
+<footer>Ảnh chỉ được gửi tới Groq để đọc chữ, không lưu lại trên máy chủ.</footer>
+
+<script>
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1FSUlEHucTeVtM3g5ELH3IwDZL4OwL0w7iOs7y_WaZbw/edit';
+const MEALS = ['Bữa sáng','Bữa trưa','Bữa tối','Café / Ăn vặt','Đi chợ / Siêu thị'];
+const TAGS  = ['Đạm','Tinh bột','Rau xanh','Trái cây','Đồ uống ngọt','Đồ uống khác','Khác'];
+
+const $ = (id) => document.getElementById(id);
+const vnd = (n) => (Math.round(Number(n)||0)).toLocaleString('vi-VN') + ' ₫';
+
+let imageData = null;
+let invoice = null;
+
+/* ---------- mật khẩu (chỉ hiện khi server bật APP_PASSWORD) ---------- */
+let appPassword = sessionStorage.getItem('app_pw') || '';
+function headers(){
+  const h = {'Content-Type':'application/json'};
+  if (appPassword) h['x-app-password'] = appPassword;
+  return h;
+}
+$('pwBtn').onclick = () => {
+  appPassword = $('pw').value.trim();
+  sessionStorage.setItem('app_pw', appPassword);
+  $('gate').classList.add('hidden');
+};
+
+/* ---------- chọn / nén ảnh ---------- */
+$('drop').onclick = () => $('file').click();
+$('file').onchange = (e) => e.target.files[0] && loadImage(e.target.files[0]);
+['dragenter','dragover'].forEach(ev => $('drop').addEventListener(ev, e => {
+  e.preventDefault(); $('drop').classList.add('over');
+}));
+['dragleave','drop'].forEach(ev => $('drop').addEventListener(ev, e => {
+  e.preventDefault(); $('drop').classList.remove('over');
+}));
+$('drop').addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0]; if (f) loadImage(f);
+});
+window.addEventListener('paste', e => {
+  const item = [...(e.clipboardData?.items||[])].find(i => i.type.startsWith('image/'));
+  if (item) loadImage(item.getAsFile());
+});
+
+function loadImage(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1280;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      imageData = c.toDataURL('image/jpeg', 0.75);
+      $('previewImg').src = imageData;
+      $('preview').style.display = 'block';
+      $('scanBtn').disabled = false;
+      clearMsg();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ---------- thông báo ---------- */
+function clearMsg(){ $('msg').innerHTML = ''; }
+function showErr(t){ $('msg').innerHTML = '<div class="err">' + escapeHtml(t) + '</div>'; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- gọi Groq ---------- */
+$('scanBtn').onclick = async () => {
+  if (!imageData) return;
+  clearMsg();
+  const btn = $('scanBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Đang đọc hóa đơn…';
+  try{
+    const r = await fetch('/api/scan', {method:'POST', headers: headers(), body: JSON.stringify({image: imageData})});
+    const data = await r.json();
+    if (r.status === 401){ $('gate').classList.remove('hidden'); throw new Error('Cần nhập mật khẩu ứng dụng'); }
+    if (!data.ok) throw new Error(data.error || 'Không đọc được hóa đơn');
+    invoice = data.invoice;
+    render();
+  }catch(err){ showErr(err.message); }
+  finally{ btn.disabled = false; btn.textContent = 'Đọc hóa đơn'; }
+};
+
+/* ---------- bảng kết quả ---------- */
+function render(){
+  $('resultCard').classList.remove('hidden');
+  $('fDate').value = invoice.date;
+  $('fInv').value = invoice.invoice_id;
+  $('fStore').value = invoice.store_name;
+
+  $('fMeal').innerHTML = MEALS.map(m =>
+    `<option${m === invoice.meal_type ? ' selected' : ''}>${m}</option>`).join('');
+
+  $('warnBox').innerHTML = (invoice.warnings && invoice.warnings.length)
+    ? '<div class="warn"><b>Cần kiểm tra lại:</b><ul>' +
+      invoice.warnings.map(w => '<li>' + escapeHtml(w) + '</li>').join('') + '</ul></div>'
+    : '';
+
+  renderItems();
+  $('resultCard').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function renderItems(){
+  $('items').innerHTML = invoice.items.map((it, i) => `
+    <div class="item" data-i="${i}">
+      <div class="top">
+        <input class="f-name" value="${escapeHtml(it.name)}" placeholder="Tên món">
+        <button class="del" data-del="${i}" title="Xóa dòng">×</button>
+      </div>
+      <div class="nums">
+        <div><label>SL</label><input class="f-qty" type="number" min="0" step="0.5" value="${it.qty}"></div>
+        <div><label>Đơn giá</label><input class="f-price" type="number" min="0" step="1000" value="${it.unit_price}"></div>
+        <div><label>Nhóm</label><select class="f-tag">${TAGS.map(t =>
+          `<option${t === it.tag ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
+        <div class="line-total" data-total="${i}">${vnd(it.qty * it.unit_price)}</div>
+      </div>
+    </div>`).join('');
+  bindItems();
+  updateTotal();
+}
+
+function bindItems(){
+  $('items').querySelectorAll('.item').forEach(el => {
+    const i = Number(el.dataset.i);
+    el.querySelector('.f-name').oninput  = e => invoice.items[i].name = e.target.value;
+    el.querySelector('.f-tag').onchange  = e => invoice.items[i].tag = e.target.value;
+    const sync = () => {
+      invoice.items[i].qty = Number(el.querySelector('.f-qty').value) || 0;
+      invoice.items[i].unit_price = Number(el.querySelector('.f-price').value) || 0;
+      invoice.items[i].total_price = invoice.items[i].qty * invoice.items[i].unit_price;
+      el.querySelector('[data-total]').textContent = vnd(invoice.items[i].total_price);
+      updateTotal();
+    };
+    el.querySelector('.f-qty').oninput = sync;
+    el.querySelector('.f-price').oninput = sync;
+    el.querySelector('.del').onclick = () => { invoice.items.splice(i,1); renderItems(); };
+  });
+}
+
+function updateTotal(){
+  const t = invoice.items.reduce((a,it) => a + (Number(it.qty)||0) * (Number(it.unit_price)||0), 0);
+  $('grandTotal').textContent = vnd(t);
+  $('saveBtn').disabled = invoice.items.length === 0;
+}
+
+$('addItem').onclick = () => {
+  invoice.items.push({name:'', qty:1, unit_price:0, total_price:0, tag:'Khác'});
+  renderItems();
+};
+
+/* ---------- lưu vào Sheet ---------- */
+$('saveBtn').onclick = async () => {
+  clearMsg();
+  const btn = $('saveBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Đang lưu…';
+
+  const payload = {
+    invoice_id: $('fInv').value.trim(),
+    date: $('fDate').value,
+    store_name: $('fStore').value.trim(),
+    meal_type: $('fMeal').value,
+    note: $('fNote').value.trim(),
+    items: invoice.items
+      .filter(it => it.name && (Number(it.qty)||0) * (Number(it.unit_price)||0) > 0)
+      .map(it => ({...it, meal_type: $('fMeal').value}))
+  };
+
+  try{
+    const r = await fetch('/api/push', {method:'POST', headers: headers(), body: JSON.stringify({invoice: payload})});
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error || 'Lưu thất bại');
+    $('msg').innerHTML = `<div class="ok">Đã ghi <b>${data.rows}</b> dòng vào Raw_Data.
+      <a href="${SHEET_URL}" target="_blank" rel="noopener">Mở Google Sheet →</a></div>`;
+    $('resultCard').classList.add('hidden');
+    $('preview').style.display = 'none';
+    $('scanBtn').disabled = true;
+    imageData = null; invoice = null;
+    $('file').value = '';
+    window.scrollTo({top:0, behavior:'smooth'});
+  }catch(err){ showErr(err.message); }
+  finally{ btn.disabled = false; btn.textContent = 'Lưu vào Google Sheet'; }
+};
+</script>
+</body>
+</html>
