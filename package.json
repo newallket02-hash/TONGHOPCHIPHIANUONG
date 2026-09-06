@@ -1,0 +1,13 @@
+{
+  "name": "quan-ly-chi-phi-an-uong",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Quet hoa don an uong bang Groq Vision va day vao Google Sheet",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}
