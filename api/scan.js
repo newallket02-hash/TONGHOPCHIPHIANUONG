@@ -8,38 +8,19 @@ const MEALS = ['Bữa sáng', 'Bữa trưa', 'Bữa tối', 'Café / Ăn vặt',
 const TAGS = ['Đạm', 'Tinh bột', 'Rau xanh', 'Trái cây', 'Đồ uống ngọt', 'Đồ uống khác', 'Khác'];
 
 const SYSTEM_PROMPT = `Bạn là chuyên gia trích xuất dữ liệu hóa đơn ăn uống tại Việt Nam.
-Đọc ảnh hóa đơn và trả về DUY NHẤT một object JSON, không kèm giải thích, không markdown.
+Trả về DUY NHẤT một object JSON, không giải thích, không markdown.
 
-Cấu trúc bắt buộc:
-{
-  "invoice_id": "mã hóa đơn in trên bill, nếu không có thì để chuỗi rỗng",
-  "date": "YYYY-MM-DD",
-  "store_name": "tên quán/siêu thị",
-  "meal_type": "một trong: ${MEALS.join(' | ')}",
-  "currency": "VND",
-  "items": [
-    {
-      "name": "tên món/mặt hàng",
-      "qty": số lượng (number),
-      "unit_price": đơn giá (number, đồng, không dấu chấm phẩy),
-      "total_price": thành tiền (number),
-      "tag": "một trong: ${TAGS.join(' | ')}"
-    }
-  ],
-  "subtotal": number,
-  "discount": number,
-  "total": number,
-  "confidence": số từ 0 đến 1,
-  "warnings": ["ghi chú nếu ảnh mờ, thiếu dòng, hoặc số liệu không khớp"]
-}
+Dùng ĐÚNG schema rút gọn sau (khóa ngắn để tiết kiệm token):
+{"id":"mã hóa đơn, không có thì để rỗng","d":"YYYY-MM-DD","s":"tên quán/siêu thị","m":"loại bữa","t":tổng tiền in trên bill (number),"it":[["tên món",SL,đơn giá,"nhóm"]]}
 
-Quy tắc:
-- Giá tiền Việt Nam thường viết 45.000 hoặc 45,000 => trả về number 45000.
-- Nếu bill ghi giá theo nghìn (vd "45" cho 45.000đ) và tổng bill khớp, hãy nhân lên cho đúng.
-- qty * unit_price phải bằng total_price. Nếu chỉ đọc được thành tiền, đặt qty = 1 và unit_price = total_price.
-- Bỏ qua các dòng không phải hàng hóa (phụ phí thanh toán, tiền khách đưa, tiền thối, điểm tích lũy).
-- Nếu bill là siêu thị/cửa hàng tạp hóa thì meal_type = "Đi chợ / Siêu thị".
-- Không bịa dữ liệu. Không đọc được ô nào thì để 0 hoặc chuỗi rỗng và ghi vào warnings.`;
+- "m" là một trong: ${MEALS.join(' | ')}
+- "nhóm" là một trong: ${TAGS.join(' | ')}
+- Mỗi phần tử của "it" là MẢNG 4 phần tử đúng thứ tự [tên, SL, đơn giá, nhóm]. Không thêm khóa nào khác.
+- Giá kiểu 45.000 hoặc 45,000 => trả về number 45000.
+- SL × đơn giá phải bằng thành tiền. Bill cân ký thì SL là số lẻ (vd 0.27). Nếu chỉ đọc được thành tiền, đặt SL=1 và đơn giá=thành tiền.
+- Bỏ các dòng không phải hàng hóa: tiền khách đưa, tiền thối, điểm tích lũy, số tiền tiết kiệm, phụ phí thanh toán.
+- Siêu thị/cửa hàng tạp hóa thì "m" = "Đi chợ / Siêu thị".
+- Không bịa dữ liệu. Ô nào không đọc được thì để 0 hoặc chuỗi rỗng.`;
 
 function toNumber(v) {
   if (typeof v === 'number' && isFinite(v)) return v;
@@ -58,7 +39,26 @@ function extractJson(text) {
   return JSON.parse(candidate.slice(start, end + 1));
 }
 
-function normalize(raw) {
+/** Doi schema rut gon {id,d,s,m,t,it:[[...]]} ve dang day du */
+function expand(raw) {
+  if (!Array.isArray(raw.it)) return raw;
+  return {
+    invoice_id: raw.id,
+    date: raw.d,
+    store_name: raw.s,
+    meal_type: raw.m,
+    total: raw.t,
+    discount: raw.disc,
+    warnings: raw.warnings,
+    items: raw.it.map((row) =>
+      Array.isArray(row)
+        ? { name: row[0], qty: row[1], unit_price: row[2], tag: row[3] }
+        : row)
+  };
+}
+
+function normalize(input) {
+  const raw = expand(input);
   const warnings = Array.isArray(raw.warnings) ? raw.warnings.slice() : [];
 
   let items = (Array.isArray(raw.items) ? raw.items : []).map((it) => {
@@ -105,6 +105,18 @@ function normalize(raw) {
   };
 }
 
+/** Anh bi cat thanh nhieu manh -> bao model biet no dang doc manh nao */
+function buildUserPrompt_(part, parts) {
+  const base = 'Trích xuất hóa đơn này thành JSON theo đúng schema rút gọn đã mô tả.';
+  const p = Number(part), n = Number(parts);
+  if (!p || !n || n < 2) return base;
+  let extra = ` Ảnh này là PHẦN ${p}/${n} của một hóa đơn dài đã được cắt ngang.`;
+  extra += ' Chỉ trích các dòng hàng nhìn thấy trong ảnh này, không suy đoán các dòng bị cắt mất.';
+  if (p > 1) extra += ' Phần đầu hóa đơn không có ở đây nên "s", "d", "id" có thể để rỗng.';
+  if (p < n) extra += ' Dòng tổng tiền không có ở đây nên "t" để 0.';
+  return base + extra;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Chỉ nhận POST' });
 
@@ -116,7 +128,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ ok: false, error: 'Sai mật khẩu ứng dụng' });
   }
 
-  const { image } = req.body || {};
+  const { image, part, parts } = req.body || {};
   if (!image || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(image)) {
     return res.status(400).json({ ok: false, error: 'Thiếu ảnh hoặc định dạng không hợp lệ' });
   }
@@ -139,7 +151,7 @@ export default async function handler(req, res) {
           {
             role: 'user',
             content: [
-              { type: 'text', text: 'Trích xuất hóa đơn này thành JSON theo đúng cấu trúc đã mô tả.' },
+              { type: 'text', text: buildUserPrompt_(part, parts) },
               { type: 'image_url', image_url: { url: image } }
             ]
           }
@@ -178,6 +190,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       model: payload.model,
+      finish_reason: choice.finish_reason,
       invoice: normalize(extractJson(content))
     });
   } catch (err) {
