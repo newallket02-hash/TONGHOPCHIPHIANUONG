@@ -5,7 +5,7 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const DEFAULT_MODEL = 'qwen/qwen3.6-27b';
 
 const MEALS = ['Bữa sáng', 'Bữa trưa', 'Bữa tối', 'Café / Ăn vặt', 'Đi chợ / Siêu thị'];
-const TAGS = ['Đạm', 'Tinh bột', 'Rau xanh', 'Trái cây', 'Đồ uống ngọt', 'Đồ uống khác', 'Khác'];
+const TAGS = ['Đạm', 'Tinh bột', 'Rau xanh', 'Trái cây', 'Đồ uống ngọt', 'Đồ uống khác', 'Đồ dùng (phi thực phẩm)', 'Khác'];
 
 const SYSTEM_PROMPT = `Bạn là chuyên gia trích xuất dữ liệu hóa đơn ăn uống tại Việt Nam.
 Trả về DUY NHẤT một object JSON, không giải thích, không markdown.
@@ -20,6 +20,9 @@ Dùng ĐÚNG schema rút gọn sau (khóa ngắn để tiết kiệm token):
 - SL × đơn giá phải bằng thành tiền. Bill cân ký thì SL là số lẻ (vd 0.27). Nếu chỉ đọc được thành tiền, đặt SL=1 và đơn giá=thành tiền.
 - Bỏ các dòng không phải hàng hóa: tiền khách đưa, tiền thối, điểm tích lũy, số tiền tiết kiệm, phụ phí thanh toán.
 - Siêu thị/cửa hàng tạp hóa thì "m" = "Đi chợ / Siêu thị".
+- Món KHÔNG ĂN ĐƯỢC (kem đánh răng, dầu gội, sữa tắm, xà phòng, nước rửa chén, nước lau nhà,
+  giấy vệ sinh, khăn giấy, bàn chải, mỹ phẩm, khẩu trang, pin, thuốc, đồ dùng nhà bếp, vật dụng)
+  BẮT BUỘC gán "nhóm" = "Đồ dùng (phi thực phẩm)". Không gán "Khác" cho các món này.
 - Không bịa dữ liệu. Ô nào không đọc được thì để 0 hoặc chuỗi rỗng.`;
 
 function toNumber(v) {
