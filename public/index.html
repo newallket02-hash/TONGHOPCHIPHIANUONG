@@ -71,6 +71,17 @@
       padding:14px 16px;font-size:14px;color:#5C4A08}
   .ok a{color:#8A6A00;font-weight:800}
   .hidden{display:none}
+  .pick-row{display:flex;gap:8px;margin-top:10px}
+  .pick-row button{flex:1}
+  .split-row{display:flex;gap:14px;align-items:flex-start;margin-top:14px;
+       background:var(--gold-tint);border:1px solid var(--gold-soft);border-radius:12px;padding:12px 13px}
+  .split-row > div{flex:0 0 150px}
+  .split-row .hint{margin:0;font-size:12px;color:#7A6212;line-height:1.45}
+  .info{background:#EEF6FF;border-left:4px solid #2C6FB5;border-radius:10px;padding:12px 14px;
+        font-size:13.5px;margin-bottom:12px;color:#1B4470}
+  .info b{display:block;margin-bottom:2px}
+  .bar{height:6px;background:#DCE9F7;border-radius:99px;margin-top:8px;overflow:hidden}
+  .bar i{display:block;height:100%;background:#2C6FB5;border-radius:99px;transition:width .3s}
   .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(58,46,5,.25);
         border-top-color:#3A2E05;border-radius:50%;animation:s .7s linear infinite;
         vertical-align:-3px;margin-right:8px}
@@ -100,11 +111,34 @@
   <div class="card" id="uploadCard">
     <h2>1 · Ảnh hóa đơn</h2>
     <div id="drop">
-      <strong>Chụp hoặc chọn ảnh</strong>
-      <span>Bấm vào đây · kéo thả · dán ảnh (Ctrl+V)</span>
+      <strong>Chọn ảnh hóa đơn</strong>
+      <span>Bấm vào đây để mở thư viện · kéo thả · dán ảnh (Ctrl+V)</span>
     </div>
-    <input type="file" id="file" accept="image/*" capture="environment" class="hidden">
+    <input type="file" id="file" accept="image/*" class="hidden">
+    <input type="file" id="cam" accept="image/*" capture="environment" class="hidden">
+
+    <div class="pick-row">
+      <button type="button" class="btn-ghost" id="pickBtn">Chọn ảnh có sẵn</button>
+      <button type="button" class="btn-ghost" id="camBtn">Chụp ảnh mới</button>
+    </div>
+
     <div id="preview"><img id="previewImg" alt="Xem trước hóa đơn"></div>
+
+    <div class="split-row">
+      <div>
+        <label for="parts">Cắt hóa đơn</label>
+        <select id="parts">
+          <option value="auto" selected>Tự động</option>
+          <option value="1">Không cắt</option>
+          <option value="2">Cắt 2 phần</option>
+          <option value="3">Cắt 3 phần</option>
+          <option value="4">Cắt 4 phần</option>
+        </select>
+      </div>
+      <p class="hint">Bill dài quá một lần đọc sẽ tự cắt ngang, đọc từng phần rồi ghép lại.
+        Gói Groq free chỉ cho ~1 lượt/phút nên mỗi phần thêm khoảng 1 phút.</p>
+    </div>
+
     <div style="height:12px"></div>
     <button class="btn-primary" id="scanBtn" disabled>Đọc hóa đơn</button>
   </div>
@@ -143,7 +177,11 @@ const TAGS  = ['Đạm','Tinh bột','Rau xanh','Trái cây','Đồ uống ngọ
 const $ = (id) => document.getElementById(id);
 const vnd = (n) => (Math.round(Number(n)||0)).toLocaleString('vi-VN') + ' ₫';
 
-let imageData = null;
+const MAX_EDGE   = 1400;   // canh dai nhat cua anh gui len Groq
+const OVERLAP   = 0.10;   // ti le chong lan giua hai manh, tranh mat dong o ranh gioi
+const RATE_WAIT = 65;     // giay cho giua hai lan goi (goi free ~1 luot/phut)
+
+let srcImg = null;        // anh goc, giu nguyen do phan giai de cat cho net
 let invoice = null;
 
 /* ---------- mật khẩu (chỉ hiện khi server bật APP_PASSWORD) ---------- */
@@ -159,9 +197,12 @@ $('pwBtn').onclick = () => {
   $('gate').classList.add('hidden');
 };
 
-/* ---------- chọn / nén ảnh ---------- */
-$('drop').onclick = () => $('file').click();
+/* ---------- chọn ảnh ---------- */
+$('drop').onclick    = () => $('file').click();
+$('pickBtn').onclick = () => $('file').click();
+$('camBtn').onclick  = () => $('cam').click();
 $('file').onchange = (e) => e.target.files[0] && loadImage(e.target.files[0]);
+$('cam').onchange  = (e) => e.target.files[0] && loadImage(e.target.files[0]);
 ['dragenter','dragover'].forEach(ev => $('drop').addEventListener(ev, e => {
   e.preventDefault(); $('drop').classList.add('over');
 }));
@@ -177,53 +218,207 @@ window.addEventListener('paste', e => {
 });
 
 function loadImage(file){
+  clearMsg();
+  info('Đang mở ảnh…');
   const reader = new FileReader();
+  reader.onerror = () => showErr('Không đọc được file ảnh. Thử chọn lại.');
   reader.onload = () => {
     const img = new Image();
+    // iPhone/Android doi khi luu HEIC — trinh duyet khong ve len canvas duoc
+    img.onerror = () => showErr(
+      'Trình duyệt không mở được ảnh này (thường gặp với ảnh HEIC của iPhone). '
+      + 'Mở ảnh trong Thư viện, bấm Chỉnh sửa rồi Lưu để chuyển sang JPG, hoặc chụp lại bằng nút Chụp ảnh mới.');
     img.onload = () => {
-      const MAX = 1280;
-      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      imageData = c.toDataURL('image/jpeg', 0.75);
-      $('previewImg').src = imageData;
+      srcImg = img;
+      $('previewImg').src = slice(0, 1);
       $('preview').style.display = 'block';
       $('scanBtn').disabled = false;
       clearMsg();
+      const ratio = img.height / img.width;
+      if (ratio > 2.2) suggest(ratio);
     };
     img.src = reader.result;
   };
   reader.readAsDataURL(file);
 }
 
+/** Bill cang dai thi cang nen cat — goi y truoc cho nguoi dung biet */
+function suggest(ratio){
+  const n = ratio > 4 ? 3 : 2;
+  info('Ảnh khá dài (cao gấp ' + ratio.toFixed(1) + ' lần chiều ngang). '
+     + 'Chế độ Tự động sẽ thử đọc nguyên ảnh trước, không được thì tự cắt làm ' + n + ' phần.');
+}
+
+/* ---------- cắt ảnh ---------- */
+/** Lay dai bang ngang tu 'from' den 'to' (ti le 0..1 theo chieu cao), tra ve dataURL JPEG */
+function slice(from, to){
+  const y0 = Math.round(srcImg.height * Math.max(0, from));
+  const y1 = Math.round(srcImg.height * Math.min(1, to));
+  const sh = Math.max(1, y1 - y0);
+  const k  = Math.min(1, MAX_EDGE / Math.max(srcImg.width, sh));
+  const c  = document.createElement('canvas');
+  c.width  = Math.round(srcImg.width * k);
+  c.height = Math.round(sh * k);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(srcImg, 0, y0, srcImg.width, sh, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.8);
+}
+
+/** Ranh gioi cua manh thu i trong n manh, co chong lan hai dau */
+function band(i, n){
+  return [
+    i === 0     ? 0 : i / n - OVERLAP,
+    i === n - 1 ? 1 : (i + 1) / n + OVERLAP
+  ];
+}
+
 /* ---------- thông báo ---------- */
 function clearMsg(){ $('msg').innerHTML = ''; }
 function showErr(t){ $('msg').innerHTML = '<div class="err">' + escapeHtml(t) + '</div>'; }
+function info(t, sub, pct){
+  $('msg').innerHTML = '<div class="info"><b>' + escapeHtml(t) + '</b>'
+    + (sub ? escapeHtml(sub) : '')
+    + (pct == null ? '' : '<div class="bar"><i style="width:' + pct + '%"></i></div>')
+    + '</div>';
+}
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 /* ---------- gọi Groq ---------- */
+async function scanPart(dataUrl, part, parts){
+  const r = await fetch('/api/scan', {
+    method: 'POST', headers: headers(),
+    body: JSON.stringify({ image: dataUrl, part, parts })
+  });
+  const data = await r.json();
+  if (r.status === 401){ $('gate').classList.remove('hidden'); throw new Error('Cần nhập mật khẩu ứng dụng'); }
+  return { ...data, status: r.status };
+}
+
+/** Loi kieu "doc khong het" — dau hieu can cat nho hon */
+function tooLong(res){
+  return /quá dài|cắt giữa chừng|JSON không hợp lệ|validate JSON/i.test(res.error || '');
+}
+
+/** Cho het cua so gioi han toc do, co dem nguoc */
+async function waitRate(label){
+  for (let s = RATE_WAIT; s > 0; s--){
+    info(label, 'Gói Groq free giới hạn ~1 lượt mỗi phút. Còn ' + s + ' giây…',
+         Math.round((RATE_WAIT - s) / RATE_WAIT * 100));
+    await sleep(1000);
+  }
+}
+
+/** Doc lan luot tung manh roi ghep. spent = da ton 1 luot goi truoc do */
+async function scanSplit(n, spent){
+  const parts = [];
+  for (let i = 0; i < n; i++){
+    if (i > 0 || spent) await waitRate('Chuẩn bị đọc phần ' + (i + 1) + '/' + n);
+    info('Đang đọc phần ' + (i + 1) + '/' + n + '…', '', Math.round(i / n * 100));
+
+    const [a, b] = band(i, n);
+    let res = await scanPart(slice(a, b), i + 1, n);
+
+    if (res.status === 429){
+      await waitRate('Groq chặn tốc độ, thử lại phần ' + (i + 1) + '/' + n);
+      res = await scanPart(slice(a, b), i + 1, n);
+    }
+    if (!res.ok) throw new Error('Phần ' + (i + 1) + '/' + n + ': ' + (res.error || 'không đọc được'));
+    parts.push(res.invoice);
+  }
+  return merge(parts);
+}
+
+/** Ghep ket qua cac manh, bo trung o vung chong lan */
+function merge(list){
+  const out = {
+    invoice_id: '', date: '', store_name: '', meal_type: '',
+    items: [], warnings: [], total: 0, subtotal: 0, discount: 0, confidence: null
+  };
+  const key = (it) => (it.name || '').toLowerCase().trim() + '|' + it.qty + '|' + it.unit_price;
+
+  list.forEach((inv, idx) => {
+    if (!out.store_name && inv.store_name) out.store_name = inv.store_name;
+    if (!out.meal_type && inv.meal_type)   out.meal_type  = inv.meal_type;
+    if (!out.date && inv.date)             out.date       = inv.date;
+    if (!out.invoice_id && inv.invoice_id && !/^HD-[A-Z0-9]+$/.test(inv.invoice_id)) {
+      out.invoice_id = inv.invoice_id;
+    }
+    out.total = Math.max(out.total, Number(inv.total) || 0);
+
+    // chi doi chieu voi manh lien truoc — dung noi trung lap that su cua bill
+    const prev = new Set((list[idx - 1]?.items || []).map(key));
+    inv.items.forEach(it => {
+      if (idx > 0 && prev.has(key(it))) return;   // dong nay da lay o manh truoc
+      out.items.push(it);
+    });
+    (inv.warnings || []).forEach(w => out.warnings.push('Phần ' + (idx + 1) + ': ' + w));
+  });
+
+  out.invoice_id = out.invoice_id || ('HD-' + Date.now().toString(36).toUpperCase());
+  out.date = out.date || new Date().toISOString().slice(0, 10);
+  out.subtotal = out.items.reduce((a, it) => a + (it.total_price || 0), 0);
+
+  out.warnings.unshift('Ảnh được cắt làm ' + list.length + ' phần rồi ghép — soát kỹ chỗ giáp ranh xem có dòng nào lặp hoặc thiếu.');
+  if (out.total && Math.abs(out.total - out.subtotal) > Math.max(2000, out.total * 0.03)){
+    out.warnings.push('Tổng các dòng (' + out.subtotal.toLocaleString('vi-VN') + '₫) lệch so với tổng in trên bill ('
+      + out.total.toLocaleString('vi-VN') + '₫).');
+  }
+  return out;
+}
+
+/* ---------- nút Đọc hóa đơn ---------- */
 $('scanBtn').onclick = async () => {
-  if (!imageData) return;
-  clearMsg();
+  if (!srcImg) return;
   const btn = $('scanBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span>Đang đọc hóa đơn…';
+  clearMsg();
+
   try{
-    const r = await fetch('/api/scan', {method:'POST', headers: headers(), body: JSON.stringify({image: imageData})});
-    const data = await r.json();
-    if (r.status === 401){ $('gate').classList.remove('hidden'); throw new Error('Cần nhập mật khẩu ứng dụng'); }
-    if (!data.ok) throw new Error(data.error || 'Không đọc được hóa đơn');
-    invoice = data.invoice;
-    render();
+    const mode = $('parts').value;
+
+    if (mode === 'auto'){
+      info('Đang đọc nguyên ảnh…');
+      let res = await scanPart(slice(0, 1), 1, 1);
+
+      if (res.status === 429){
+        await waitRate('Groq chặn tốc độ, thử lại');
+        res = await scanPart(slice(0, 1), 1, 1);
+      }
+      if (res.ok){ invoice = res.invoice; render(); return; }
+      if (!tooLong(res)) throw new Error(res.error || 'Không đọc được hóa đơn');
+
+      const n = srcImg.height / srcImg.width > 4 ? 3 : 2;
+      info('Hóa đơn dài hơn một lượt đọc — tự cắt làm ' + n + ' phần.');
+      await sleep(1200);
+      invoice = await scanSplit(n, true);
+      render();
+
+    } else if (mode === '1'){
+      info('Đang đọc nguyên ảnh…');
+      let res = await scanPart(slice(0, 1), 1, 1);
+      if (res.status === 429){
+        await waitRate('Groq chặn tốc độ, thử lại');
+        res = await scanPart(slice(0, 1), 1, 1);
+      }
+      if (!res.ok) throw new Error(res.error || 'Không đọc được hóa đơn');
+      invoice = res.invoice;
+      render();
+
+    } else {
+      invoice = await scanSplit(Number(mode), false);
+      render();
+    }
   }catch(err){ showErr(err.message); }
   finally{ btn.disabled = false; btn.textContent = 'Đọc hóa đơn'; }
 };
 
 /* ---------- bảng kết quả ---------- */
 function render(){
+  clearMsg();
   $('resultCard').classList.remove('hidden');
   $('fDate').value = invoice.date;
   $('fInv').value = invoice.invoice_id;
@@ -249,7 +444,7 @@ function renderItems(){
         <button class="del" data-del="${i}" title="Xóa dòng">×</button>
       </div>
       <div class="nums">
-        <div><label>SL</label><input class="f-qty" type="number" min="0" step="0.5" value="${it.qty}"></div>
+        <div><label>SL</label><input class="f-qty" type="number" min="0" step="0.001" value="${it.qty}"></div>
         <div><label>Đơn giá</label><input class="f-price" type="number" min="0" step="1000" value="${it.unit_price}"></div>
         <div><label>Nhóm</label><select class="f-tag">${TAGS.map(t =>
           `<option${t === it.tag ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
@@ -316,8 +511,8 @@ $('saveBtn').onclick = async () => {
     $('resultCard').classList.add('hidden');
     $('preview').style.display = 'none';
     $('scanBtn').disabled = true;
-    imageData = null; invoice = null;
-    $('file').value = '';
+    srcImg = null; invoice = null;
+    $('file').value = ''; $('cam').value = '';
     window.scrollTo({top:0, behavior:'smooth'});
   }catch(err){ showErr(err.message); }
   finally{ btn.disabled = false; btn.textContent = 'Lưu vào Google Sheet'; }
