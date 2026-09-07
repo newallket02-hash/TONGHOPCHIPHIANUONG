@@ -8,7 +8,9 @@
  */
 
 var MEAL_TYPES = ['Bữa sáng', 'Bữa trưa', 'Bữa tối', 'Café / Ăn vặt', 'Đi chợ / Siêu thị'];
-var NUTRITION_TAGS = ['Đạm', 'Tinh bột', 'Rau xanh', 'Trái cây', 'Đồ uống ngọt', 'Đồ uống khác', 'Khác'];
+var NONFOOD = 'Đồ dùng (phi thực phẩm)';   // loai khoi moi con so ve chi phi AN UONG
+var NUTRITION_TAGS = ['Đạm', 'Tinh bột', 'Rau xanh', 'Trái cây', 'Đồ uống ngọt', 'Đồ uống khác',
+                      NONFOOD, 'Khác'];
 
 var NAVY = '#2F4F4F';      // celadon-dark: header
 var CELADON = '#AEC9B4';   // celadon: nhan phu
@@ -123,30 +125,37 @@ function setupDashboard_(ss) {
     .setBorder(true, true, true, true, false, false, GOLD, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
   // KPI
-  var kpiLabels = ['Tổng chi tháng', 'Trung bình / ngày', 'Số ngày có chi', '% ngân sách đã dùng', 'Ăn ngoài', 'Đi chợ / Siêu thị'];
-  var kpiCells = ['B7', 'C7', 'D7', 'E7', 'F7', 'G7'];
-  var kpiFormulas = [
-    '=SUMIF(Raw_Data!$L:$L,$C$4,Raw_Data!$H:$H)',
-    '=IFERROR($B$8/$D$8,0)',
-    '=COUNTUNIQUEIFS(Raw_Data!$A:$A,Raw_Data!$L:$L,$C$4)',
-    '=IFERROR($B$8/$C$5,0)',
-    '=SUMIFS(Raw_Data!$H:$H,Raw_Data!$L:$L,$C$4,Raw_Data!$C:$C,"<>Đi chợ / Siêu thị")',
-    '=SUMIFS(Raw_Data!$H:$H,Raw_Data!$L:$L,$C$4,Raw_Data!$C:$C,"Đi chợ / Siêu thị")'
+  // Cot E va I la khoang trong cua cac block ben duoi -> hang KPI nhay qua chung.
+  var notNF = ',Raw_Data!$I:$I,"<>' + NONFOOD + '"';
+  var kpi = [
+    ['B', 'Tổng chi ăn uống',
+     '=SUMIFS(Raw_Data!$H:$H,Raw_Data!$L:$L,$C$4' + notNF + ')', '#,##0 "₫"'],
+    ['C', 'Trung bình / ngày', '=IFERROR($B$8/$D$8,0)', '#,##0 "₫"'],
+    ['D', 'Số ngày có chi',
+     '=COUNTUNIQUEIFS(Raw_Data!$A:$A,Raw_Data!$L:$L,$C$4)', '#,##0" ngày"'],
+    ['F', '% ngân sách đã dùng', '=IFERROR($B$8/$C$5,0)', '0.0%'],
+    ['G', 'Ăn ngoài',
+     '=SUMIFS(Raw_Data!$H:$H,Raw_Data!$L:$L,$C$4,Raw_Data!$C:$C,"<>Đi chợ / Siêu thị"' + notNF + ')', '#,##0 "₫"'],
+    ['H', 'Đi chợ / Siêu thị',
+     '=SUMIFS(Raw_Data!$H:$H,Raw_Data!$L:$L,$C$4,Raw_Data!$C:$C,"Đi chợ / Siêu thị"' + notNF + ')', '#,##0 "₫"'],
+    ['J', 'Đồ dùng (không tính vào ăn uống)',
+     '=SUMIFS(Raw_Data!$H:$H,Raw_Data!$L:$L,$C$4,Raw_Data!$I:$I,"' + NONFOOD + '")', '#,##0 "₫"']
   ];
-  var kpiFormats = ['#,##0 "₫"', '#,##0 "₫"', '#,##0" ngày"', '0.0%', '#,##0 "₫"', '#,##0 "₫"'];
-
-  for (var i = 0; i < kpiLabels.length; i++) {
-    var col = 2 + i;
-    sh.getRange(7, col).setValue(kpiLabels[i])
-      .setBackground(CELADON).setFontColor('#1B3B2F').setFontWeight('bold').setFontSize(9)
-      .setHorizontalAlignment('center').setWrap(true);
-    sh.getRange(8, col).setFormula(kpiFormulas[i]).setNumberFormat(kpiFormats[i])
-      .setBackground(CELADON_LT).setFontSize(14).setFontWeight('bold')
+  kpi.forEach(function (k) {
+    var nf = (k[0] === 'J');
+    sh.getRange(k[0] + '7').setValue(k[1])
+      .setBackground(nf ? GOLD : CELADON).setFontColor(nf ? '#FFFFFF' : '#1B3B2F')
+      .setFontWeight('bold').setFontSize(9)
+      .setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(true);
+    sh.getRange(k[0] + '8').setFormula(k[2]).setNumberFormat(k[3])
+      .setBackground(nf ? GOLD_LT : CELADON_LT).setFontSize(14).setFontWeight('bold')
       .setHorizontalAlignment('center').setVerticalAlignment('middle');
-  }
-  sh.setRowHeight(7, 32);
+  });
+  sh.setRowHeight(7, 34);
   sh.setRowHeight(8, 44);
-  sh.getRange('B7:G8').setBorder(true, true, true, true, true, true, '#FFFFFF', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  sh.getRange('B7:D8').setBorder(true, true, true, true, true, true, '#FFFFFF', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  sh.getRange('F7:H8').setBorder(true, true, true, true, true, true, '#FFFFFF', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  sh.getRange('J7:J8').setBorder(true, true, true, true, false, false, '#FFFFFF', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
   // Canh bao vuot ngan sach
   sh.setConditionalFormatRules([
@@ -158,30 +167,35 @@ function setupDashboard_(ss) {
       .setRanges([sh.getRange('E8')]).build()
   ]);
 
+  sh.getRange('J9').setValue('Kem đánh răng, giấy, dầu gội… gán nhóm "' + NONFOOD
+      + '" là tự nhảy vào ô này và bị loại khỏi mọi con số ăn uống bên trái.')
+    .setFontSize(8).setFontColor('#8C8271').setWrap(true);
+  sh.setRowHeight(9, 32);
+
   // Cac bang QUERY
   blockTitle_(sh, 'B10', 'CHI TIÊU THEO BỮA');
   sh.getRange('B11').setFormula(
-    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select C, sum(H), count(E) where L = \'"&$C$4&"\' and C is not null group by C order by sum(H) desc label C \'Bữa\', sum(H) \'Tổng chi\', count(E) \'Số món\'"),"Chưa có dữ liệu")');
+    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select C, sum(H), count(E) where L = \'"&$C$4&"\' and C is not null and I <> \'Đồ dùng (phi thực phẩm)\' group by C order by sum(H) desc label C \'Bữa\', sum(H) \'Tổng chi\', count(E) \'Số món\'"),"Chưa có dữ liệu")');
 
   blockTitle_(sh, 'F10', 'TOP 10 CỬA HÀNG');
   sh.getRange('F11').setFormula(
-    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select D, sum(H), count(E) where L = \'"&$C$4&"\' and D is not null group by D order by sum(H) desc limit 10 label D \'Cửa hàng\', sum(H) \'Tổng chi\', count(E) \'Số món\'"),"Chưa có dữ liệu")');
+    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select D, sum(H), count(E) where L = \'"&$C$4&"\' and D is not null and I <> \'Đồ dùng (phi thực phẩm)\' group by D order by sum(H) desc limit 10 label D \'Cửa hàng\', sum(H) \'Tổng chi\', count(E) \'Số món\'"),"Chưa có dữ liệu")');
 
   blockTitle_(sh, 'J10', 'THEO NHÓM DINH DƯỠNG');
   sh.getRange('J11').setFormula(
-    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select I, sum(H) where L = \'"&$C$4&"\' and I is not null group by I order by sum(H) desc label I \'Nhóm\', sum(H) \'Tổng chi\'"),"Chưa có dữ liệu")');
+    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select I, sum(H) where L = \'"&$C$4&"\' and I is not null and I <> \'Đồ dùng (phi thực phẩm)\' group by I order by sum(H) desc label I \'Nhóm\', sum(H) \'Tổng chi\'"),"Chưa có dữ liệu")');
 
   blockTitle_(sh, 'B20', 'CHI TIÊU THEO NGÀY');
   sh.getRange('B21').setFormula(
-    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select A, sum(H) where L = \'"&$C$4&"\' and A is not null group by A order by A label A \'Ngày\', sum(H) \'Tổng chi\'"),"Chưa có dữ liệu")');
+    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select A, sum(H) where L = \'"&$C$4&"\' and A is not null and I <> \'Đồ dùng (phi thực phẩm)\' group by A order by A label A \'Ngày\', sum(H) \'Tổng chi\'"),"Chưa có dữ liệu")');
 
   blockTitle_(sh, 'F20', 'CHI TIÊU THEO TUẦN');
   sh.getRange('F21').setFormula(
-    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select K, sum(H), count(E) where L = \'"&$C$4&"\' and K is not null group by K order by K label K \'Tuần\', sum(H) \'Tổng chi\', count(E) \'Số món\'"),"Chưa có dữ liệu")');
+    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select K, sum(H), count(E) where L = \'"&$C$4&"\' and K is not null and I <> \'Đồ dùng (phi thực phẩm)\' group by K order by K label K \'Tuần\', sum(H) \'Tổng chi\', count(E) \'Số món\'"),"Chưa có dữ liệu")');
 
   blockTitle_(sh, 'J20', 'TOP 10 MÓN TỐN TIỀN NHẤT');
   sh.getRange('J21').setFormula(
-    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select E, sum(H) where L = \'"&$C$4&"\' and E is not null group by E order by sum(H) desc limit 10 label E \'Món\', sum(H) \'Tổng chi\'"),"Chưa có dữ liệu")');
+    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select E, sum(H) where L = \'"&$C$4&"\' and E is not null and I <> \'Đồ dùng (phi thực phẩm)\' group by E order by sum(H) desc limit 10 label E \'Món\', sum(H) \'Tổng chi\'"),"Chưa có dữ liệu")');
 
   sh.getRange('C11:D30').setNumberFormat('#,##0 "₫"');
   sh.getRange('G11:H30').setNumberFormat('#,##0 "₫"');
@@ -232,49 +246,127 @@ function buildCharts_(sh) {
 }
 
 /* ------------------------------------------------------------------ MENU */
+/**
+ * Chay rieng ham nay khi muon dung lai tab Menu_De_Xuat ma khong dung
+ * lai Raw_Data / Dashboard.
+ */
+function rebuildMenu() {
+  setupMenu_(SpreadsheetApp.getActiveSpreadsheet());
+  SpreadsheetApp.getUi().alert('Đã dựng lại tab Menu_De_Xuat.');
+}
+
 function setupMenu_(ss) {
   var sh = ss.getSheetByName('Menu_De_Xuat') || ss.insertSheet('Menu_De_Xuat', 2);
   sh.clear();
   sh.setHiddenGridlines(true);
 
-  sh.getRange('A1:F1').merge().setValue('THỰC ĐƠN GỢI Ý TRONG TUẦN — cân bằng dinh dưỡng & ngân sách')
+  sh.getRange('A1:G1').merge()
+    .setValue('THỰC ĐƠN GỢI Ý TRONG TUẦN — món miền Trung, dựa trên hóa đơn đã mua')
     .setBackground(NAVY).setFontColor('#FFFFFF').setFontSize(14).setFontWeight('bold')
     .setHorizontalAlignment('center').setVerticalAlignment('middle');
   sh.setRowHeight(1, 42);
 
-  var head = ['Thứ / Ngày', 'Bữa sáng (30–50k)', 'Bữa trưa (45–65k)', 'Bữa tối (tự nấu)',
-              'Mẹo cân bằng', 'Dự chi/ngày (₫)'];
-  sh.getRange(2, 1, 1, head.length).setValues([head])
+  var head = ['Thứ', 'Bữa sáng (ăn ngoài)', 'Bữa tối (tự nấu)',
+              'Nguyên liệu chính', 'Đã có trong hóa đơn', 'Cần mua thêm', 'Dự chi/ngày (₫)'];
+  sh.getRange(3, 1, 1, head.length).setValues([head])
     .setBackground(CELADON).setFontColor('#1B3B2F').setFontWeight('bold')
     .setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(true);
-  sh.setRowHeight(2, 36);
-  sh.setFrozenRows(2);
+  sh.setRowHeight(3, 36);
+  sh.setFrozenRows(3);
 
+  // Cot D la danh sach tu khoa, ngan cach bang dau phay — cot E va F do
+  // chinh no ma tra nguoc vao Raw_Data, nen sua D la E/F tu cap nhat.
   var rows = [
-    ['Thứ Hai', 'Bánh mì ốp la + cà phê đen', 'Cơm gà luộc xé phay rau răm', 'Canh bầu nấu tôm + cá bống kho tộ', 'Mở tuần thanh nhẹ, hạn chế dầu mỡ', 120000],
-    ['Thứ Ba', 'Bún mọc / bún thang', 'Cơm văn phòng cá thu sốt cà', 'Trứng chiên hành + canh mồng tơi cua đồng', 'Ưu tiên đạm và canxi', 125000],
-    ['Thứ Tư', 'Cháo yến mạch ức gà', 'Cơm sườn nướng kèm kim chi', 'Canh chua cá lóc + rau muống luộc', 'Bổ sung vitamin C và chất xơ', 130000],
-    ['Thứ Năm', 'Hủ tiếu Nam Vang', 'Cơm cá ba sa phi lê kho thơm', 'Canh khổ qua nhồi thịt băm', 'Thanh nhiệt giữa tuần', 125000],
-    ['Thứ Sáu', 'Bánh cuốn chả quế', 'Bún bò Huế / bún chả', 'Đậu hũ sốt cà chua + rau củ kho quẹt', 'Bữa nhẹ bụng, dồn ngân sách cho cuối tuần', 130000],
-    ['Thứ Bảy', 'Phở bò tái gầu', 'Bún chả giò thịt nướng', 'Lẩu gà lá giang / cá nướng giấy bạc', 'Đổi vị cuối tuần', 165000],
-    ['Chủ Nhật', 'Bánh canh cua', 'Steak bò nướng salad / ăn ngoài', 'Súp bí đỏ thịt băm + salad cá ngừ', 'Tổng kết tuần, sơ chế nguyên liệu cho tuần sau', 175000]
+    ['Thứ Hai',
+     'Bánh mì kẹp trứng + cà phê phin đen (bánh sandwich đã có sẵn)',
+     'Cá nục kho ớt nghệ + canh bắp cải thảo nấu tôm khô',
+     'cá nục, bắp cải, bánh sanwich', 55000],
+    ['Thứ Ba',
+     'Bún bò Huế',
+     'Canh củ dền hầm xương + thịt xay xào đậu que',
+     'xương heo, củ dền, thịt xay', 75000],
+    ['Thứ Tư',
+     'Mì Quảng gà / tôm thịt',
+     'Khổ qua xào trứng + canh mướp hương nấu thịt xay',
+     'khổ qua, mướp hương, thịt xay', 70000],
+    ['Thứ Năm',
+     'Bánh bèo – bánh nậm – bánh lọc',
+     'Cá nục hấp cuốn bánh tráng + rau sống chấm mắm nêm',
+     'cá nục, bánh tráng', 65000],
+    ['Thứ Sáu',
+     'Cháo lòng + bánh tráng ớt nướng',
+     'Ram cuốn cải (chả ram Bình Định) + canh khoai tây hầm xương',
+     'thịt xay, bánh tráng, khoai tây, xương heo', 75000],
+    ['Thứ Bảy',
+     'Bánh canh Nam Phổ / bánh canh cá lóc',
+     'Bún cá ngừ kho thơm + rau luộc chấm mắm nêm',
+     'cá ngừ', 90000],
+    ['Chủ Nhật',
+     'Bánh ướt thịt nướng + cà phê',
+     'Mít trộn bánh tráng (Đà Nẵng) + canh bắp cải cuốn thịt',
+     'mít, bánh tráng, bắp cải, thịt xay', 85000]
   ];
-  sh.getRange(3, 1, rows.length, head.length).setValues(rows)
-    .setWrap(true).setVerticalAlignment('top');
 
-  sh.getRange(3 + rows.length, 1, 1, 5).merge().setValue('TỔNG DỰ CHI TUẦN')
+  for (var i = 0; i < rows.length; i++) {
+    var r = 4 + i;
+    sh.getRange(r, 1).setValue(rows[i][0]);
+    sh.getRange(r, 2).setValue(rows[i][1]);
+    sh.getRange(r, 3).setValue(rows[i][2]);
+    sh.getRange(r, 4).setValue(rows[i][3]);
+    sh.getRange(r, 5).setFormula(matchFormula_(r, true));
+    sh.getRange(r, 6).setFormula(matchFormula_(r, false));
+    sh.getRange(r, 7).setValue(rows[i][4]);
+  }
+
+  var last = 3 + rows.length;
+  sh.getRange(last + 1, 1, 1, 6).merge().setValue('TỔNG DỰ CHI TUẦN')
     .setFontWeight('bold').setHorizontalAlignment('right').setBackground(GOLD_LT);
-  sh.getRange(3 + rows.length, 6).setFormula('=SUM(F3:F' + (2 + rows.length) + ')')
+  sh.getRange(last + 1, 7).setFormula('=SUM(G4:G' + last + ')')
     .setFontWeight('bold').setBackground(GOLD_LT);
 
-  sh.getRange('A3:A' + (3 + rows.length)).setFontWeight('bold').setBackground(CELADON_LT);
-  sh.getRange('F3:F' + (3 + rows.length)).setNumberFormat('#,##0 "₫"').setHorizontalAlignment('right');
-  [110, 210, 220, 260, 240, 130].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
-  for (var r = 3; r <= 2 + rows.length; r++) sh.setRowHeight(r, 52);
-
-  sh.getRange(2, 1, rows.length + 2, head.length)
+  sh.getRange(4, 1, rows.length, 7).setWrap(true).setVerticalAlignment('top');
+  sh.getRange('A4:A' + (last + 1)).setFontWeight('bold').setBackground(CELADON_LT);
+  sh.getRange('G4:G' + (last + 1)).setNumberFormat('#,##0 "₫"').setHorizontalAlignment('right');
+  sh.getRange('E4:E' + last).setFontColor('#1B6B3A');
+  sh.getRange('F4:F' + last).setFontColor('#A8500A');
+  for (var r2 = 4; r2 <= last; r2++) sh.setRowHeight(r2, 52);
+  sh.getRange(3, 1, rows.length + 2, 7)
     .setBorder(true, true, true, true, true, true, '#C9D6CD', SpreadsheetApp.BorderStyle.SOLID);
+
+  // Kho nguyen lieu: doc thang tu Raw_Data, chi lay cac lan di cho
+  var pantryRow = last + 3;
+  sh.getRange(pantryRow, 1, 1, 3).merge()
+    .setValue('NGUYÊN LIỆU ĐÃ MUA TRONG 14 NGÀY (tự đọc từ Raw_Data)')
+    .setBackground(GOLD).setFontColor('#FFFFFF').setFontWeight('bold').setFontSize(10)
+    .setVerticalAlignment('middle');
+  sh.setRowHeight(pantryRow, 26);
+  sh.getRange(pantryRow + 1, 1).setFormula(
+    '=IFERROR(QUERY(Raw_Data!$A$2:$L,"select E, I, A where A >= date \'"&TEXT(TODAY()-14,"yyyy-mm-dd")&"\' and C = \'Đi chợ / Siêu thị\' and I <> \'Đồ dùng (phi thực phẩm)\' order by A desc label E \'Nguyên liệu\', I \'Nhóm\', A \'Ngày mua\'"),"Chưa có hóa đơn đi chợ nào trong 14 ngày")');
+  sh.getRange(pantryRow + 1, 3, 40, 1).setNumberFormat('yyyy-mm-dd');
+
+  sh.getRange(pantryRow + 5, 5, 1, 3).merge()
+    .setValue('Cột "Đã có" và "Cần mua" là công thức dò ngược vào Raw_Data theo từ khóa ở cột D. '
+            + 'Sửa từ khóa ở D là hai cột kia tự đổi theo.')
+    .setWrap(true).setFontSize(9).setFontColor('#8C8271').setVerticalAlignment('top');
+
+  [95, 250, 300, 200, 175, 175, 110].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
   return sh;
+}
+
+/**
+ * Cot D chua cac tu khoa ngan cach bang dau phay. Ham nay tra ve cong thuc
+ * loc nhung tu khoa CO (matched=true) hoac KHONG CO (matched=false) trong
+ * cot "Món / Mặt hàng" cua Raw_Data.
+ */
+function matchFormula_(row, matched) {
+  var op = matched ? '>0' : '=0';
+  var alt = matched ? '"— chưa có món nào"' : '"— đủ nguyên liệu"';
+  return '=IF($D' + row + '="","",IFERROR(IF(TEXTJOIN(", ",TRUE,ARRAYFORMULA(IF('
+       + 'COUNTIF(Raw_Data!$E:$E,"*"&TRIM(SPLIT($D' + row + ',","))&"*")' + op + ','
+       + 'TRIM(SPLIT($D' + row + ',",")),"")))="",' + alt + ','
+       + 'TEXTJOIN(", ",TRUE,ARRAYFORMULA(IF('
+       + 'COUNTIF(Raw_Data!$E:$E,"*"&TRIM(SPLIT($D' + row + ',","))&"*")' + op + ','
+       + 'TRIM(SPLIT($D' + row + ',",")),"")))),""))';
 }
 
 function cleanupDefaultSheet_(ss) {
