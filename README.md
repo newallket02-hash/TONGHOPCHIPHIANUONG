@@ -103,7 +103,7 @@ framework (zero-config: `public/` là static, `api/` là serverless functions), 
 | Biến | Giá trị |
 |---|---|
 | `GROQ_API_KEY` | lấy ở https://console.groq.com/keys |
-| `GROQ_MODEL` | `qwen/qwen3.6-27b` |
+| `GROQ_MODEL` | `qwen/qwen3.8-27b` |
 | `APPS_SCRIPT_URL` | URL `/exec` ở bước 2 |
 | `SHARED_SECRET` | **giống hệt** Script Property ở bước 2 |
 | `APP_PASSWORD` | tùy chọn — đặt để người lạ có link cũng không dùng được |
@@ -122,10 +122,10 @@ Tính đến 09/2026, model nhận ảnh trên Groq là:
 
 | Model | Ảnh/request | JSON mode |
 |---|---|---|
-| `qwen/qwen3.6-27b` | 5 | có |
-| `qwen/qwen3.8-27b` | 3 | không nêu trong tài liệu |
+| `qwen/qwen3.6-27b` | 5 | có (đã bị Groq gỡ khỏi danh sách model 17/09/2026, không dùng được nữa) |
+| `qwen/qwen3.8-27b` | 3 | chưa rõ — tài liệu Groq không nêu, cần test thực tế trước khi tin tưởng |
 
-Code dùng `qwen/qwen3.6-27b` vì có JSON mode. Đổi model chỉ cần sửa biến `GROQ_MODEL`, không cần sửa code.
+Đang dùng `qwen/qwen3.8-27b` (đổi từ `qwen/qwen3.6-27b` vì Groq đã gỡ hẳn model đó khỏi GroqCloud ngày 17/09/2026). **Chưa xác nhận** `qwen3.8-27b` có giữ được JSON mode giống `3.6` hay không — nên thử quét 1 hóa đơn thật để chắc JSON mode + `reasoning_effort: "none"` vẫn hoạt động đúng, tránh lặp lại lỗi `Failed to validate JSON`. Đổi model chỉ cần sửa biến `GROQ_MODEL`, không cần sửa code.
 
 ### Giới hạn tốc độ của gói free (đã gặp thật)
 
