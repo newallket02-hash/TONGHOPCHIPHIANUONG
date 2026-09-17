@@ -2,7 +2,7 @@
 // -> goi Groq Vision, tra ve JSON hoa don da chuan hoa (CHUA ghi vao Sheet)
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const DEFAULT_MODEL = 'qwen/qwen3.6-27b';
+const DEFAULT_MODEL = 'qwen/qwen3.8-27b';
 
 const MEALS = ['Bữa sáng', 'Bữa trưa', 'Bữa tối', 'Café / Ăn vặt', 'Đi chợ / Siêu thị'];
 const TAGS = ['Đạm', 'Tinh bột', 'Rau xanh', 'Trái cây', 'Đồ uống ngọt', 'Đồ uống khác', 'Đồ dùng (phi thực phẩm)', 'Khác'];
